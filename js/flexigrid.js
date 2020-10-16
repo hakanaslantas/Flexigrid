@@ -92,7 +92,8 @@
 			rp: 15, //results per page
 			rpOptions: [10, 15, 20, 30, 50], //allowed per-page values
 			title: false,
-			idProperty: 'id',
+			//idProperty: 'id',
+			uidProperty: 'uid',
 			pagestat: 'Displaying {from} to {to} of {total} items',
 			pagetext: 'Page',
 			outof: 'of',
@@ -103,7 +104,7 @@
 			qtype: '',
 			nomsg: 'No items',
 			minColToggle: 1, //minimum allowed column to be hidden
-			showToggleBtn: true, //show or hide column toggle popup
+			showToggleBtn: false, //show or hide column toggle popup
 			hideOnSubmit: true,
 			autoload: true,
 			blockOpacity: 0.5,
@@ -148,7 +149,7 @@
 				var cdleft = 0 - this.hDiv.scrollLeft;
 				if (this.hDiv.scrollLeft > 0) cdleft -= Math.floor(p.cgwidth / 2);
 				$(g.cDrag).css({
-					top: g.hDiv.offsetTop + 1
+					top: 0
 				});
 				var cdpad = this.cdpad;
 				var cdcounter=0;
@@ -178,7 +179,7 @@
 					}
 				);
 				var nd = parseInt($(g.nDiv).height(), 10);
-				if (nd > newH) $(g.nDiv).height(newH).width(200);
+				if (nd > newH) $(g.nDiv).height(100).width(200);
 				else $(g.nDiv).height('auto').width('auto');
 				$(g.block).css({
 					height: newH,
@@ -341,7 +342,12 @@
 				$('body').css('cursor', 'default');
 				$('body').noSelect(false);
 			},
+			/**************
+			 * 
+			 * column menu
+			 */
 			toggleCol: function (cid, visible) {
+			
 				var ncol = $("th[axis='col" + cid + "']", this.hDiv)[0];
 				var n = $('thead th', g.hDiv).index(ncol);
 				var cb = $('input[value=' + cid + ']', g.nDiv)[0];
@@ -435,6 +441,7 @@
 				this.buildpager();
 				//build new body
 				var tbody = document.createElement('tbody');
+				
 				if (p.dataType == 'json') {
 					$.each(data.rows, function (i, row) {
 						var tr = document.createElement('tr');
@@ -445,18 +452,31 @@
 						} else {
 							if (i % 2 && p.striped) tr.className = 'erow';
 						}
+					
 						if (row[p.idProperty]) {
 							tr.id = 'row' + row[p.idProperty];
 							jtr.attr('data-id', row[p.idProperty]);
 						}
+						var uid=p.uidProperty;
+						if (uid) {
+							jtr.attr('data-uid', row.cell.uid);
+						}
+
 						$('thead tr:first th', g.hDiv).each( //add cell
 							function () {
 								var td = document.createElement('td');
 								var idx = $(this).attr('axis').substr(3);
+								//console.log(p.colModel[idx].customVal);
+								var cval=p.colModel[idx].customVal;
 								td.align = this.align;
 								// If each row is the object itself (no 'cell' key)
 								if (typeof row.cell == 'undefined') {
-									td.innerHTML = row[p.colModel[idx].name];
+									var customVal=p.colModel[idx].customVal;
+									if(customVal!=undefined){
+										td.innerHTML = cval;
+									}else{
+										td.innerHTML = row[p.colModel[idx].name];
+									}
 								} else {
 									// If the json elements aren't named (which is typical), use numeric order
                                     var iHTML = '';
@@ -628,35 +648,63 @@
 				if (p.page > p.pages) {
 					p.page = p.pages;
 				}
-				var param = [{
-					name: 'page',
-					value: p.newp
-				}, {
-					name: 'rp',
-					value: p.rp
-				}, {
-					name: 'sortname',
-					value: p.sortname
-				}, {
-					name: 'sortorder',
-					value: p.sortorder
-				}, {
-					name: 'query',
-					value: p.query
-				}, {
-					name: 'qtype',
-					value: p.qtype
-				}];
-				if (p.params.length) {
-					for (var pi = 0; pi < p.params.length; pi++) {
-						param[param.length] = p.params[pi];
+
+				param = {
+					"flexi": [
+						{ name:"page",value: p.newp },
+						{ name:"rp",value: p.rp },
+						{ name:"sortname",value: p.sortname },
+						{ name:"sortorder",value: p.sortorder },
+						{ name:"query",value: p.query },
+						{ name:"qtype",value: p.qtype },
+					]
+				}	
+						
+				/*var param = [
+					{
+						name: 'page',
+						value: p.newp
+					}, 
+					{
+						name: 'rp',
+						value: p.rp
+					}, 
+					{
+						name: 'sortname',
+						value: p.sortname
+					}, 
+					{
+						name: 'sortorder',
+						value: p.sortorder
+					}, 
+					{
+						name: 'query',
+						value: p.query
+					}, 
+					{
+						name: 'qtype',
+						value: p.qtype
 					}
+				];*/
+				
+				
+				if (p.params.length) {
+
+					param["filters"]=p.params; //EXTRA ARAMA ALANLARI VE MANUEL ARAMA FORMU İÇİN EKLENDİ HAKAN
+					// EXTRA ARAMA ALANLARI İÇİN KAPATILDI
+					/*for (var pi = 0; pi < p.params.length; pi++) {
+						
+						param[param.length] = p.params[pi];
+						
+					}*/
 				}
+				//console.log(param)	
 				$.ajax({
 					type: p.method,
 					url: p.url,
-					data: param,
+					data: JSON.stringify(param), // sınırsız arama alanı post etmek için değiştirildi hakan orjinali data:param
 					dataType: p.dataType,
+
 					success: function (data) {
 						g.addData(data);
 					},
@@ -673,10 +721,15 @@
 				p.newp = 1;
 				this.populate();
 			},
+			EpixSearch: function (params=Array()) { // custom search hakan
+				p.newp = 1;
+				this.populate();
+			},
 			changePage: function (ctype) { //change page
 				if (this.loading) {
 					return true;
 				}
+				
 				switch (ctype) {
 					case 'first':
 						p.newp = 1;
@@ -720,6 +773,7 @@
 			addCellProp: function () {
 				$('tbody tr td', g.bDiv).each(function () {
 					var tdDiv = document.createElement('div');
+					tdDiv.setAttribute("class","tdiv");
 					var n = $('td', $(this).parent()).index(this);
 					var pth = $('th:eq(' + n + ')', g.hDiv).get(0);
 					if (pth != null) {
@@ -775,8 +829,10 @@
 			},
 			addRowProp: function () {
 				$('tbody tr', g.bDiv).on('click', function (e) {
+					
 					var obj = (e.target || e.srcElement);
 					if (obj.href || obj.type) return true;
+					
 					if (e.ctrlKey || e.metaKey) {
 						// mousedown already took care of this case
 						return;
@@ -897,21 +953,28 @@
 		};
         
         g = p.getGridClass(g); //get the grid class
-        
+		
+		/*****************
+		 * 
+		 * SÜTUN ÖZELLİKLERİ
+		 */
 		if (p.colModel) { //create model if any
 			thead = document.createElement('thead');
 			var tr = document.createElement('tr');
 			for (var i = 0; i < p.colModel.length; i++) {
 				var cm = p.colModel[i];
 				var th = document.createElement('th');
+				
 				$(th).attr('axis', 'col' + i);
 				if( cm ) {	// only use cm if its defined
+					
 					if ($.cookies) {
 						var cookie_width = 'flexiwidths/'+cm.name;		// Re-Store the widths in the cookies
 						if( $.cookie(cookie_width) != undefined ) {
 							cm.width = $.cookie(cookie_width);
 						}
 					}
+				
 					if( cm.display != undefined ) {
 						th.innerHTML = cm.display;
 					}
@@ -954,7 +1017,7 @@
 		g.tDiv = document.createElement('div'); //create toolbar
 		g.sDiv = document.createElement('div');
 		g.pDiv = document.createElement('div'); //create pager container
-        
+	
         if(p.colResize === false) { //don't display column drag if we are not using it
             $(g.cDrag).css('display', 'none');
         }
@@ -984,27 +1047,40 @@
 			for (var i = 0; i < p.buttons.length; i++) {
 				var btn = p.buttons[i];
 				if (!btn.separator) {
+					/***TOOBAR CHANGED USING DOM ADDED TEXT PROP and font icon */
 					var btnDiv = document.createElement('div');
+					var btnLink=document.createElement('a');
+					var btnIcon=document.createElement('i');
+
+					btnLink.setAttribute("class",btn.bclass);
+					btnLink.href='javascript:void(0)';
+					btnLink.id=btn.name;
+					btnLink.appendChild(btnIcon);
+					btnLink.append(" "+btn.text);
+					
+					btnCmd=btn.cmd;
 					btnDiv.className = 'fbutton';
-					btnDiv.innerHTML = ("<div><span>") + (btn.hidename ? "&nbsp;" : btn.name) + ("</span></div>");
-					if (btn.bclass) $('span', btnDiv).addClass(btn.bclass).css({
+					btnDiv.appendChild(btnLink);
+					if (btn.bclass) $('a', btnDiv).addClass(btn.bclass).css({
 						paddingLeft: 20
 					});
-					if (btn.bimage) // if bimage defined, use its string as an image url for this buttons style (RS)
-						$('span',btnDiv).css( 'background', 'url('+btn.bimage+') no-repeat center left' );
-						$('span',btnDiv).css( 'paddingLeft', 20 );
+					
+					if (btn.bicon) // if bimage defined, use its string as an image url for this buttons style (RS)
+						btnIcon.setAttribute("class",btn.bicon);
 
 					if (btn.tooltip) // add title if exists (RS)
-						$('span',btnDiv)[0].title = btn.tooltip;
+						$('a',btnDiv)[0].title = btn.tooltip;
 
 					btnDiv.onpress = btn.onpress;
 					btnDiv.name = btn.name;
+					// added cmd prop hakan
+					btnDiv.bcmd = btn.bcmd;
 					if (btn.id) {
 						btnDiv.id = btn.id;
 					}
 					if (btn.onpress) {
 						$(btnDiv).click(function () {
-							this.onpress(this.id || this.name, g.gDiv);
+							this.onpress(this.bcmd || this.name, g.gDiv);
 						});
 					}
 					$(tDiv2).append(btnDiv);
@@ -1050,8 +1126,8 @@
 						.addClass(btn.bclass)
 						.css({paddingLeft:20})
 						;
-					if (btn.bimage)  // if bimage defined, use its string as an image url for this buttons style (RS)
-						$(btnOpt).css( 'background', 'url('+btn.bimage+') no-repeat center left' );
+					if (btn.bicon)  // if bimage defined, use its string as an image url for this buttons style (RS)
+						$(btnOpt).css( 'background', 'url('+btn.bicon+') no-repeat center left' );
 						$(btnOpt).css( 'paddingLeft', 20 );
 
 					if (btn.tooltip) // add title if exists (RS)
@@ -1078,9 +1154,12 @@
 		thead = null;
 		if (!p.colmodel) var ci = 0;
 		$('thead tr:first th', g.hDiv).each(function () {
+			
 			var thdiv = document.createElement('div');
+			thdiv.setAttribute("style","height:30px!important");
 			if ($(this).attr('abbr')) {
 				$(this).click(function (e) {
+					//console.log($(this))
 					if (!$(this).hasClass('thOver')) return false;
 					var obj = (e.target || e.srcElement);
 					if (obj.href || obj.type) return true;
@@ -1260,25 +1339,118 @@
 			$(g.gDiv).append(g.rDiv);
 		}
 		// add pager
+		// pagination changed dom  HAKAN
 		if (p.usepager) {
 			g.pDiv.className = 'pDiv';
 			g.pDiv.innerHTML = '<div class="pDiv2"></div>';
 			$(g.bDiv).after(g.pDiv);
-			var html = ' <div class="pGroup"> <div class="pFirst pButton"><span></span></div><div class="pPrev pButton"><span></span></div> </div> <div class="btnseparator"></div> <div class="pGroup"><span class="pcontrol">' + p.pagetext + ' <input type="text" size="4" value="1" /> ' + p.outof + ' <span> 1 </span></span></div> <div class="btnseparator"></div> <div class="pGroup"> <div class="pNext pButton"><span></span></div><div class="pLast pButton"><span></span></div> </div> <div class="btnseparator"></div> <div class="pGroup"> <div class="pReload pButton"><span></span></div> </div> <div class="btnseparator"></div> <div class="pGroup"><span class="pPageStat"></span></div>';
-			$('div', g.pDiv).html(html);
-			$('.pReload', g.pDiv).click(function () {
+			var pgdiv=document.createElement("div");
+			pgdiv.setAttribute("class","col-md-9");
+			
+			var nav=document.createElement("nav");
+			var ul=document.createElement("ul");
+			ul.setAttribute("class","pagination");
+
+			var liFirst=document.createElement("li");
+			liFirst.setAttribute("class","page-item");
+			var liSpan=document.createElement("span");
+			liSpan.setAttribute("class","page-link");
+			var lia=document.createElement("a");
+			lia.setAttribute("href","javascript:void(0);")
+			liFirst.setAttribute("class","pFirst")
+			lia.innerHTML='<i class="fa fa-backward"></i> ';
+			liSpan.appendChild(lia);
+			liFirst.appendChild(liSpan);
+			
+
+			var liPrev=document.createElement("li");
+			liPrev.setAttribute("class","page-item");
+			var liSpan=document.createElement("span");
+			liSpan.setAttribute("class","page-link");
+			var lia=document.createElement("a");
+			lia.setAttribute("href","javascript:void(0);")
+			liPrev.setAttribute("class","pPrev")
+			lia.innerHTML='<i class="fa fa-chevron-left"></i> ';
+			liSpan.appendChild(lia);
+			liPrev.appendChild(liSpan);
+			
+
+			var liCur=document.createElement("li");
+			liCur.setAttribute("class","page-item");
+			var liSpan=document.createElement("span");
+			liSpan.setAttribute("class","pcontrol");
+			liSpan.innerHTML='<input type="text" size="3" value="1" class="form-control" />';
+			liCur.appendChild(liSpan);			
+			
+
+			var liNext=document.createElement("li");
+			liNext.setAttribute("class","page-item");
+			var liSpan=document.createElement("span");
+			liSpan.setAttribute("class","page-link");
+			var lia=document.createElement("a");
+			lia.setAttribute("href","javascript:void(0);")
+			liNext.setAttribute("class","pNext")
+			lia.innerHTML='<i class="fa fa-chevron-right"></i> ';
+			liSpan.appendChild(lia);
+			liNext.appendChild(liSpan);
+
+
+			var liReload=document.createElement("li");
+			liReload.setAttribute("class","page-item");
+			var liSpan=document.createElement("span");
+			liSpan.setAttribute("class","page-link");
+			var lia=document.createElement("a");
+			lia.setAttribute("href","javascript:void(0);")
+			liReload.setAttribute("class","pReload")
+			lia.innerHTML='<i class="fa fa-sync-alt"></i> ';
+			liSpan.appendChild(lia);
+			liReload.appendChild(liSpan);
+
+
+			var liLast=document.createElement("li");
+			var liSpan=document.createElement("span");
+			liSpan.setAttribute("class","page-link");
+			var lia=document.createElement("a");
+			lia.setAttribute("href","javascript:void(0);")
+			lia.innerHTML='<i class="fa fa-forward"></i> ';
+			liSpan.appendChild(lia);
+			liLast.appendChild(liSpan);			
+			liLast.setAttribute("class","page-item pLast");
+
+
+
+			var liStat=document.createElement("li");
+			var liSpan=document.createElement("span");
+			liSpan.setAttribute("class","page-link pPageStat");
+			liStat.appendChild(liSpan);			
+			liStat.setAttribute("class","page-item pgStat");
+
+			ul.appendChild(liFirst);
+			ul.appendChild(liPrev);
+			ul.appendChild(liCur);
+			ul.appendChild(liNext);
+			ul.appendChild(liLast);
+			ul.appendChild(liReload);
+			
+			ul.appendChild(liStat);
+
+
+			nav.appendChild(ul);
+			pgdiv.appendChild(nav);
+			$('div', g.pDiv).html(nav);
+			$('li.pReload', g.pDiv).click(function () {
 				g.populate();
 			});
-			$('.pFirst', g.pDiv).click(function () {
+			$('li.pFirst').click(function () {
 				g.changePage('first');
 			});
-			$('.pPrev', g.pDiv).click(function () {
+			$('li.pPrev').click(function () {
 				g.changePage('prev');
 			});
-			$('.pNext', g.pDiv).click(function () {
+			$('li.pNext').click(function () {
 				g.changePage('next');
 			});
-			$('.pLast', g.pDiv).click(function () {
+			$('li.pLast').click(function () {
 				g.changePage('last');
 			});
 			$('.pcontrol input', g.pDiv).keydown(function (e) {
@@ -1299,7 +1471,8 @@
 					else sel = '';
 					opt += "<option value='" + p.rpOptions[nx] + "' " + sel + " >" + p.rpOptions[nx] + "&nbsp;&nbsp;</option>";
 				}
-				$('.pDiv2', g.pDiv).prepend("<div class='pGroup'><select name='rp'>" + opt + "</select></div> <div class='btnseparator'></div>");
+				$(".pgStat").before("<li class='page-item'><select class='form-control' name='rp'>" + opt + "</select></li>");
+				//$('.pDiv2', g.pDiv).prepend("<div class='pGroup '><select class='form-control' name='rp'>" + opt + "</select></div>");
 				$('select', g.pDiv).change(function () {
 					if (p.onRpChange) {
 						p.onRpChange(+this.value);
@@ -1322,6 +1495,7 @@
 				g.sDiv.className = 'sDiv';
 				var sitems = p.searchitems;
 				var sopt = '', sel = '';
+				
 				for (var s = 0; s < sitems.length; s++) {
 					if (p.qtype === '' && sitems[s].isdefault === true) {
 						p.qtype = sitems[s].name;
@@ -1353,7 +1527,9 @@
 					p.query = '';
 					g.doSearch();
 				});
-				$(g.bDiv).after(g.sDiv);
+				
+				//console.log(g);
+				//$(g.bDiv).after(g.sDiv); sdiv bottom üste taşındığı için burayı kapattım.
 			}
 		}
 		$(g.pDiv, g.sDiv).append("<div style='clear:both'></div>");
@@ -1361,6 +1537,7 @@
 		if (p.title) {
 			g.mDiv.className = 'mDiv';
 			g.mDiv.innerHTML = '<div class="ftitle">' + p.title + '</div>';
+			
 			$(g.gDiv).prepend(g.mDiv);
 			if (p.showTableToggleBtn) {
 				$(g.mDiv).append('<div class="ptogtitle" title="Minimize/Maximize Table"><span></span></div>');
@@ -1370,6 +1547,9 @@
 				});
 			}
 		}
+
+		// ADD SEARCH DIV TO TOP HAKAN
+		$(g.gDiv).prepend(g.sDiv);
 		//setup cdrops
 		g.cdropleft = document.createElement('span');
 		g.cdropleft.className = 'cdropleft';
@@ -1394,6 +1574,7 @@
 		if ($('th', g.hDiv).length) {
 			g.nDiv.className = 'nDiv';
 			g.nDiv.innerHTML = "<table cellpadding='0' cellspacing='0'><tbody></tbody></table>";
+			
 			$(g.nDiv).css({
 				marginBottom: (gh * -1),
 				display: 'none',
@@ -1431,6 +1612,7 @@
 					return true;
 				}
 			);
+			
 			if (p.showToggleBtn) {
 				$(g.gDiv).prepend(g.nBtn);
 			}
@@ -1499,11 +1681,17 @@
 			}
 		});
 	}; //end flexigrid
+
 	$.fn.flexReload = function (p) { // function to reload grid
 		return this.each(function () {
 			if (this.grid && this.p.url) this.grid.populate();
 		});
 	}; //end flexReload
+	$.fn.EpixSearch = function (p) { // function to reload grid
+		return this.each(function () {
+			if (this.grid) this.grid.EpixSearch();
+		});
+	}; //end EpixSearch	
 	$.fn.flexOptions = function (p) { //function to update general options
 		return this.each(function () {
 			if (this.grid) $.extend(this.p, p);
@@ -1549,12 +1737,12 @@
 	$.fn.selectedRows = function (p) { // Returns the selected rows as an array, taken and adapted from http://stackoverflow.com/questions/11868404/flexigrid-get-selected-row-columns-values
 		var arReturn = [];
 		var arRow = [];
-		var selector = $(this.selector + ' .trSelected');
-
-
+		var selector = $(p + ' .trSelected');
+		
 		$(selector).each(function (i, row) {
 			arRow = [];
 			var idr = $(row).data('id');
+			
 			$.each(row.cells, function (c, cell) {
 				var col = cell.abbr;
 				var val = cell.firstChild.innerHTML;
